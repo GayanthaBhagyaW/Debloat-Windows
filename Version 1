@@ -1,0 +1,140 @@
+# Windows 11 Debloater for All Users
+# Run as Administrator
+
+# Display Disclaimer
+Write-Host "****************************************************" -ForegroundColor Yellow
+Write-Host "*  THIS PROGRAM IS MAINTAINED AND DEVELOPED BY     *" -ForegroundColor Yellow
+Write-Host "*  GAYANTHA WIJEYAWARDENA                          *" -ForegroundColor Yellow
+Write-Host "*  CONTACT: gayanthabhagya@gmail.com              *" -ForegroundColor Yellow
+Write-Host "****************************************************" -ForegroundColor Yellow
+
+Write-Host "Starting Windows 11 Debloat process for all users..." -ForegroundColor Cyan
+
+# List of unnecessary apps to remove
+$BloatwareApps = @(
+    "Microsoft.3DBuilder",
+    "Microsoft.BingNews",
+    "Microsoft.BingWeather",
+    "Microsoft.GetHelp",
+    "Microsoft.Getstarted",
+    "Microsoft.Messaging",
+    "Microsoft.Microsoft3DViewer",
+    "Microsoft.MicrosoftOfficeHub",
+    "Microsoft.MicrosoftSolitaireCollection",
+    "Microsoft.MixedReality.Portal",
+    "Microsoft.MSPaint",
+    "Microsoft.People",
+    "Microsoft.Print3D",
+    "Microsoft.SkypeApp",
+    "Microsoft.Wallet",
+    "Microsoft.Whiteboard",
+    "Microsoft.WindowsAlarms",
+    "Microsoft.WindowsCamera",
+    "Microsoft.WindowsFeedbackHub",
+    "Microsoft.WindowsMaps",
+    "Microsoft.WindowsSoundRecorder",
+    "Microsoft.Xbox.TCUI",
+    "Microsoft.XboxApp",
+    "Microsoft.XboxGameOverlay",
+    "Microsoft.XboxGamingOverlay",
+    "Microsoft.XboxIdentityProvider",
+    "Microsoft.XboxSpeechToTextOverlay",
+    "Microsoft.YourPhone",
+    "Microsoft.ZuneMusic",
+    "Microsoft.ZuneVideo"
+)
+
+# Function to remove bloatware apps
+Function Remove-Bloatware {
+    param (
+        [string]$AppName
+    )
+    Get-AppxPackage -AllUsers -Name $AppName | Remove-AppxPackage -AllUsers
+    Get-AppxProvisionedPackage -Online | Where-Object DisplayName -like "*$AppName*" | ForEach-Object {
+        Remove-AppxProvisionedPackage -Online -PackageName $_.PackageName
+    }
+}
+
+# Removing unnecessary apps for ALL users
+Write-Host "Removing unnecessary apps for all users..." -ForegroundColor Yellow
+foreach ($app in $BloatwareApps) {
+    Write-Host "Removing $app..."
+    Remove-Bloatware -AppName $app
+}
+
+# Apply to future users by modifying the Default profile
+Write-Host "Removing bloatware from Default User Profile (affects new users)..." -ForegroundColor Yellow
+$DefaultUserPath = "C:\Users\Default\AppData\Local\Packages"
+if (Test-Path $DefaultUserPath) {
+    Get-ChildItem $DefaultUserPath -Force | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# Removing bloatware from existing user profiles
+Write-Host "Removing bloatware from all existing user profiles..." -ForegroundColor Yellow
+$UserProfiles = Get-WmiObject Win32_UserProfile | Where-Object { $_.Special -eq $false }
+foreach ($User in $UserProfiles) {
+    $UserPath = $User.LocalPath
+    $PackagesPath = "$UserPath\AppData\Local\Packages"
+    if (Test-Path $PackagesPath) {
+        Get-ChildItem $PackagesPath -Force | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+# Disabling Xbox Services
+Write-Host "Disabling Xbox Services..." -ForegroundColor Yellow
+Get-Service Xbox* | Stop-Service -Force
+Get-Service Xbox* | Set-Service -StartupType Disabled
+
+# Disabling Cortana
+Write-Host "Disabling Cortana for all users..." -ForegroundColor Yellow
+$UserRegistryPaths = @(
+    "HKCU:\Software\Microsoft\Windows\CurrentVersion\Search",
+    "HKU:\.DEFAULT\Software\Microsoft\Windows\CurrentVersion\Search"
+)
+foreach ($Path in $UserRegistryPaths) {
+    If (Test-Path $Path) {
+        Set-ItemProperty -Path $Path -Name "CortanaConsent" -Value 0
+    }
+}
+
+# Disabling Telemetry Services
+Write-Host "Disabling Telemetry Services..." -ForegroundColor Yellow
+$TelemetryServices = @(
+    "DiagTrack",
+    "dmwappushservice"
+)
+foreach ($service in $TelemetryServices) {
+    Stop-Service $service -Force
+    Set-Service $service -StartupType Disabled
+}
+
+# Removing Unnecessary Scheduled Tasks
+Write-Host "Disabling Unnecessary Scheduled Tasks..." -ForegroundColor Yellow
+$Tasks = @(
+    "\Microsoft\Windows\Customer Experience Improvement Program\Consolidator",
+    "\Microsoft\Windows\Customer Experience Improvement Program\UsbCeip",
+    "\Microsoft\Windows\Customer Experience Improvement Program\KernelCeipTask"
+)
+foreach ($task in $Tasks) {
+    Write-Host "Disabling $task..."
+    schtasks /Change /TN $task /Disable
+}
+
+# Adjusting Privacy Settings for all users
+Write-Host "Disabling Windows Feedback & Data Collection for all users..." -ForegroundColor Yellow
+$PrivacyRegistryPaths = @(
+    "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection",
+    "HKCU:\Software\Microsoft\Siuf\Rules",
+    "HKU:\.DEFAULT\Software\Microsoft\Siuf\Rules"
+)
+foreach ($Path in $PrivacyRegistryPaths) {
+    If (Test-Path $Path) {
+        Set-ItemProperty -Path $Path -Name "AllowTelemetry" -Value 0
+        Set-ItemProperty -Path $Path -Name "NumberOfSIUFInPeriod" -Value 0
+        Set-ItemProperty -Path $Path -Name "PeriodInNanoSeconds" -Value 0
+    }
+}
+
+Write-Host "****************************************************" -ForegroundColor Green
+Write-Host "*          WINDOWS 11 DEBLOAT COMPLETE!           *" -ForegroundColor Green
+Write-Host "****************************************************" -ForegroundColor Green
